@@ -216,7 +216,7 @@ def get_all_objects(context):
     return clarisse_array_to_python_list(nodes_array)
 
 
-# --------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 def get_all_attributes(node, type_filter=None):
     """
     Returns a python list of all the attribute objects for the object: "object".
@@ -251,7 +251,7 @@ def get_all_attributes(node, type_filter=None):
     return output
 
 
-# --------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 def get_all_attribute_values(attribute):
     """
     Returns a python lost of all the values for a specified attribute object.
