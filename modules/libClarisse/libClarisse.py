@@ -1,4 +1,5 @@
 import os.path
+import re
 import tempfile
 import time
 
@@ -49,6 +50,23 @@ def clarisse_array_to_python_list(clarisse_array):
         output.append(clarisse_array[i])
 
     return output
+
+
+# ------------------------------------------------------------------------------
+def selection_to_context_list():
+    """
+    Takes in the selection and returns a list of contexts.
+
+    :return:
+    """
+
+    items = clarisse_array_to_python_list(ix.selection)
+    contexts = list()
+    for item in items:
+        if item.is_context():
+            contexts.append(item)
+
+    return contexts
 
 
 # ------------------------------------------------------------------------------
@@ -383,3 +401,282 @@ def make_contexts_atomic(contexts):
         ix.application.check_for_events()
         ix.cmds.MakeLocalContexts([context])
         os.remove(temp_p)
+
+
+# ------------------------------------------------------------------------------
+def create_metadata_node(context, data, name):
+    """
+    Given a context, this will create a metadata node in that location, fill it
+    with the data from the data list, and then lock it.
+
+    :param context: A clarisse context inside of which we will be creating the
+           metadata node.
+    :param data: A list of category-key-value-type sub-lists that will be stored
+           as attributes in this node. Example: [[cat, key, value, type],
+           [cat2, key2, value2, type2], ... ]
+    :param name: The name of the metadata node to create.
+
+    :return: Nothing
+    """
+
+    meta_node = context.item_exists(name)
+
+    if meta_node is not None:
+
+        # Unlock the object
+        ix.cmds.UnlockItems([meta_node.get_full_name()])
+
+    else:
+
+        # Create the metadata object
+        meta_node = context.add_object(name, "ProjectItem")
+
+    # Add or change the metadata on the object
+    for item in data:
+        set_custom_attr(meta_node, str(item[0]), str(item[1]), str(item[2]), str(item[3]))
+
+    # lock it
+    ix.cmds.LockItems([meta_node.get_full_name()])
+
+
+# ------------------------------------------------------------------------------
+def save_snapshot():
+    """
+    Saves a snapshot of the current clarisse scene alongside the location where
+    the actual scene itself lives.
+    """
+
+    name = ix.application.get_current_project_filename()
+    if name:
+        ix.application.save_project_snapshot(name)
+        return True
+    return False
+
+
+# ------------------------------------------------------------------------------
+def is_dirty():
+    """
+    If the scene needs to be saved, return True
+
+    :return: True if the scene has changes that need to be saved.
+    """
+
+    if ix.is_gui_application():
+        return str(ix.application.get_top_window().get_title()).endswith("*")
+    return True
+
+
+# ------------------------------------------------------------------------------
+def get_current_project_file_name(return_full_path=True):
+    """
+    Returns the current project's full name (including path if fullPath is True)
+
+    :param return_full_path: Whether to include the full path, or just the
+           project name.
+
+    :return: Either the name of the project file or the full path to the project
+             file (depending on whether return_full_path is True or not).
+    """
+
+    path = ix.application.get_current_project_filename()
+    if return_full_path:
+        return path
+    else:
+        return os.path.split(path)[1]
+
+
+# ------------------------------------------------------------------------------
+def set_custom_attr(item,
+                    section,
+                    key,
+                    value,
+                    attr_type="string"):
+    """
+    Adds a custom attribute to the passed node. The custom attribute will be in
+    the section defined by 'section'. The type is assumed to be string unless
+    otherwise specified. If, for example, a color needs to be passed, then it
+    should be passed as a list or tuple of length 3. Other multi-value values
+    should be passed in the same manner. Returns the attribute added.
+
+    :param item: Node on which to set the custom attribute
+    :param section: Section in which to place the custom attribute
+    :param key: Name of the attribute
+    :param value: Value of the attribute
+    :param attr_type: Type of the attribute
+
+    :return: A clarisse attribute object
+    """
+
+    # Convert the attrType to all lowercase
+    attr_type = attr_type.lower()
+
+    if attr_type == "bool" or attr_type == "boolean":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_BOOL,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_DEFAULT,
+                                  section)
+        value = str(value)
+        if value.upper() in ["TRUE", "T", "YES", "Y", "1", "ON"]:
+            attr.set_bool(True)
+        else:
+            attr.set_bool(False)
+
+    elif attr_type == "long" or attr_type == "integer":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_LONG,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_DEFAULT,
+                                  section)
+        attr.set_long(int(value))
+
+    elif attr_type == "double":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_DEFAULT,
+                                  section)
+        attr.set_long(float(value))
+
+    elif attr_type == "string":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_STRING,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_DEFAULT,
+                                  section)
+        attr.set_string(str(value))
+
+    elif attr_type == "reference":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_REFERENCE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_DEFAULT,
+                                  section)
+        attr.set_object(value)
+
+    elif attr_type == "percentage":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_PERCENTAGE,
+                                  section)
+        attr.set_double(float(value))
+
+    elif attr_type == "distance":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_DISTANCE,
+                                  section)
+        attr.set_double(float(value))
+
+    elif attr_type == "angle":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_ANGLE,
+                                  section)
+        attr.set_double(float(value))
+
+    elif attr_type == "scale":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_SCALE,
+                                  section)
+        attr.set_double(float(value))
+
+    elif attr_type == "frame":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_LONG,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_FRAME,
+                                  section)
+        attr.set_long(int(value))
+
+    elif attr_type == "subframe":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_SUBFRAME,
+                                  section)
+        attr.set_double(float(value))
+
+    elif attr_type == "l":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_L,
+                                  section)
+        attr.set_double(float(value))
+
+    elif attr_type == "la":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_LA,
+                                  section)
+        attr.set_value_count(2)
+        attr.set_double(float(value[0]), 0)
+        attr.set_double(float(value[1]), 1)
+
+    elif attr_type == "rgb":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_RGB,
+                                  section)
+        attr.set_value_count(3)
+        attr.set_double(float(value[0]), 0)
+        attr.set_double(float(value[1]), 1)
+        attr.set_double(float(value[2]), 2)
+
+    elif attr_type == "rgba":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_RGBA,
+                                  section)
+        attr.set_value_count(4)
+        attr.set_double(float(value[0]), 0)
+        attr.set_double(float(value[1]), 1)
+        attr.set_double(float(value[2]), 2)
+        attr.set_double(float(value[3]), 3)
+
+    elif attr_type == "filein":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_FILE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_FILENAME_OPEN,
+                                  section)
+        attr.set_string(value)
+
+    elif attr_type == "fileout":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_FILE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_FILENAME_SAVE,
+                                  section)
+        attr.set_string(value)
+
+    elif attr_type == "pixel":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_PIXEL,
+                                  section)
+        attr.set_double(float(value))
+
+    elif attr_type == "subpixel":
+        attr = item.add_attribute(key,
+                                  ix.api.OfAttr.TYPE_DOUBLE,
+                                  ix.api.OfAttr.CONTAINER_SINGLE,
+                                  ix.api.OfAttr.VISUAL_HINT_SUBPIXEL,
+                                  section)
+        attr.set_double(float(value))
+
+    else:
+
+        raise TypeError("attrType not a legal type.")
+
+    return attr
