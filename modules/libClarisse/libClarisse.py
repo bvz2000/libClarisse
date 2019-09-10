@@ -29,7 +29,6 @@ def pdir_to_path(path, project_p):
         project_p = os.path.split(project_p)[0]
 
     path = path.replace("$PDIR", project_p)
-    path = os.path.abspath(path)
 
     return path
 
