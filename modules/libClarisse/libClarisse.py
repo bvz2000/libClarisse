@@ -268,6 +268,20 @@ def get_all_attributes(node, type_filter=None):
 
 
 # ------------------------------------------------------------------------------
+def get_attribute_obj(node, attr_name):
+    """
+    Given a node and an attribute name, return the attribute object.
+
+    :param node: The node we want to collect the attribute from.
+    :param attr_name: The name of the attribute we want to get.
+
+    :return: An attribute object.
+    """
+
+    return node.get_attribute(attr_name)
+
+
+# ------------------------------------------------------------------------------
 def get_all_attribute_values(attribute):
     """
     Returns a python lost of all the values for a specified attribute object.
@@ -278,7 +292,29 @@ def get_all_attribute_values(attribute):
     """
 
     # Get all the values of this attribute
-    values_array = ix.api.OfObjectArray()
+    # TODO: Not all of these are mapped to the correct type
+    values_array = ix.api.CoreStringArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_BOOL:
+        values_array = ix.api.IntArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_LONG:
+        values_array = ix.api.IntArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_DOUBLE:
+        values_array = ix.api.DoubleArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_STRING:
+        values_array = ix.api.CoreStringArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_FILE:
+        values_array = ix.api.CoreStringArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_REFERENCE:
+        values_array = ix.api.CoreStringArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_OBJECT:
+        values_array = ix.api.OfObjectArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_CURVE:
+        values_array = ix.api.CoreStringArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_ACTION:
+        values_array = ix.api.CoreStringArray()
+    if attribute.get_type() == ix.api.OfAttr.TYPE_COUNT:
+        values_array = ix.api.CoreStringArray()
+
     attribute.get_values(values_array)
 
     return clarisse_array_to_python_list(values_array)
@@ -431,7 +467,11 @@ def create_metadata_node(context, data, name):
 
     # Add or change the metadata on the object
     for item in data:
-        set_custom_attr(meta_node, str(item[0]), str(item[1]), str(item[2]), str(item[3]))
+        set_custom_attr(meta_node,
+                        str(item[0]),
+                        str(item[1]),
+                        str(item[2]),
+                        str(item[3]))
 
     # lock it
     ix.cmds.LockItems([meta_node.get_full_name()])
