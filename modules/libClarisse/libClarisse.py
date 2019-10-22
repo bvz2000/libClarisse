@@ -372,13 +372,14 @@ def contexts_are_atomic(contexts):
 
 
 # ------------------------------------------------------------------------------
-def export_context_with_deps(context, dest, overwrite=False):
+def export_context_without_deps(context, dest, overwrite=False):
     """
     Exports the context passed to an external file without changing the open
     project. The file will be saved into the location specified by dest, and
     with a file name that matches the context name. If the file already exists,
     and if overwrite is False, an error is raised. If overwrite is True, then
-    the file will be overwritten.
+    the file will be overwritten. This ignores any external dependencies that
+    the context may have.
 
     :param context: A context to export as a project with dependencies.
     :param dest: The directory where the contexts should be exported. If this
@@ -390,6 +391,60 @@ def export_context_with_deps(context, dest, overwrite=False):
 
     :return: The path to the exported project.
     """
+
+    assert (os.path.exists(dest))
+    assert (os.path.isdir(dest))
+
+    file_p = os.path.join(dest, context.get_name() + ".project")
+    if os.path.exists(file_p):
+        if not overwrite:
+            msg = "File exists and overwrite is False: " + file_p
+            raise IOError(msg)
+    file_p = os.path.join(dest, context.get_name() + ".project")
+    ix.ix.export_context_as_project(context, file_p)
+
+    return file_p
+
+
+# ------------------------------------------------------------------------------
+def export_context_with_deps(context, dest, overwrite=False):
+    """
+    Exports the context passed to an external file without changing the open
+    project. The file will be saved into the location specified by dest, and
+    with a file name that matches the context name. If the file already exists,
+    and if overwrite is False, an error is raised. If overwrite is True, then
+    the file will be overwritten.
+
+    NOTE: DO NOT USE! CLARISSE HAS A BUG WHERE THIS FUNCTION BREAKS ALEMBIC
+          AND PROJECT REFERENCES!
+
+    :param context: A context to export as a project with dependencies.
+    :param dest: The directory where the contexts should be exported. If this
+           directory does not exist or is a file, an AssertionError will be
+           raised.
+    :param overwrite: If the destination file already exists, if overwrite is
+           set to True then these files will be overwritten. If overwrite is
+           False, then an IOError will be raised.
+
+    :return: The path to the exported project.
+    """
+
+    # TODO: FIX THIS WHEN ISOTROPIX FIXES THE BUG
+    print "\n" * 5
+    print "#" * 200
+    print "WARNING!!!!!!!!!!!!!!!!!!!!!!!!"
+    print "-" * 20
+    print "THIS FUNCTION IS CURRENTLY BROKEN: "
+    print "     export_context_with_deps"
+    print "DUE TO A CLARISSE BUG. IT IS CURRENTLY BEING REPLACED WITH"
+    print "     export_context_without_deps"
+    print "UNTIL ISOTROPIX RELEASES A BUG FIX.\n\n"
+    file_p = export_context_without_deps(context=context,
+                                         dest=dest,
+                                         overwrite=overwrite)
+    return file_p
+
+    assert False  # DO NOT USE THIS FUNCTION TILL IT IS FIXED BY ISOTROPIX
 
     assert(os.path.exists(dest))
     assert(os.path.isdir(dest))
