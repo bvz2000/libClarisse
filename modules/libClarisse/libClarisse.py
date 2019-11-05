@@ -34,6 +34,72 @@ def pdir_to_path(path, project_p):
 
 
 # ------------------------------------------------------------------------------
+def node_is_within_ref(node):
+    """
+    Given a node, returns whether or not this node is within a referenced
+    context anywhere along its ancestry - i.e. if any parent or grandparent is
+    a reference, return True. Note: if a node is itself a reference, that does
+    not count as being within a reference.
+
+    :param node: The node being tested.
+
+    :return: True if any parent of the node is a reference, False otherwise.
+    """
+
+    parents = list()
+    while node.get_full_name() != "project:/":
+        node = node.get_parent_item()
+        parents.append(node)
+    for parent in parents:
+        if parent.is_reference():
+            return True
+    return False
+
+
+# ------------------------------------------------------------------------------
+def localize(references):
+    """
+    Given a list of clarisse references, localize them (fixing the $PDIR
+    variable at the same time).
+
+    :param references: A python list of references.
+
+    :return: Nothing.
+    """
+
+    references = filter_contexts_to_references_only(contexts=references,
+                                                    project=True,
+                                                    abc=False,
+                                                    usd=False)
+
+    for context in references:
+
+        pdir = context.get_attribute("filename").get_string()
+
+        ix.cmds.MakeLocalContexts([context])
+
+        items = get_all_contexts(context=context, recursive=True)
+        items.extend(get_all_objects(context=context))
+
+        for item in items:
+            if not(node_is_within_ref(item)):
+                attr_objs = list()
+                for attr_id in range(item.get_attribute_count()):
+                    attr_objs.append(item.get_attribute(attr_id))
+                for attr_obj in attr_objs:
+                    if attr_obj.get_type() == 3 or attr_obj.get_type() == 4:
+                        elem_count = attr_obj.get_value_count()
+                        for i in range(elem_count):
+                            value = attr_obj.get_raw_string(i)
+                            print "--->",
+                            print item.get_name(),
+                            print attr_obj.get_name(),
+                            print i,
+                            print value
+                            attr_obj.set_string(value.replace("$PDIR", pdir), i)
+
+
+# ------------------------------------------------------------------------------
 def clarisse_array_to_python_list(clarisse_array):
     """
     Convert a libClarisse array to a python list.
@@ -202,6 +268,9 @@ def filter_contexts_to_references_only(contexts, project=True, abc=True,
     output = list()
 
     for context in contexts:
+
+        if not context.is_context():
+            continue
 
         if context.is_reference():
             if project:
