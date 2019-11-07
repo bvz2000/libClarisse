@@ -74,7 +74,7 @@ def localize(references):
 
     for context in references:
 
-        pdir = context.get_attribute("filename").get_string()
+        pdir = os.path.split(context.get_attribute("filename").get_string())[0]
 
         ix.cmds.MakeLocalContexts([context])
 
@@ -91,12 +91,9 @@ def localize(references):
                         elem_count = attr_obj.get_value_count()
                         for i in range(elem_count):
                             value = attr_obj.get_raw_string(i)
-                            print "--->",
-                            print item.get_name(),
-                            print attr_obj.get_name(),
-                            print i,
-                            print value
-                            attr_obj.set_string(value.replace("$PDIR", pdir), i)
+                            if "$PDIR" in value:
+                                value = value.replace("$PDIR", pdir)
+                                attr_obj.set_string(value, i)
 
 
 # ------------------------------------------------------------------------------
@@ -428,7 +425,6 @@ def contexts_are_atomic(contexts):
 
         # Skip non-contexts
         if not context.is_context():
-            print context.get_name() + " is not a context. Skipping."
             continue
 
         ext_refs, ext_sources = get_external_dependencies(context)
